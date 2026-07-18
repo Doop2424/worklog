@@ -428,25 +428,34 @@ input:focus{outline:2px solid var(--amber); outline-offset:1px;}
 
   // ---------- excel export ----------
   function exportXlsx(){
-    var rows = [];
-    Object.keys(state.records).sort().forEach(function(ds){
-      var r = state.records[ds];
-      var wl = worklogLabel(r);
-      var todos = r.todos || [];
-      if(!todos.length){
-        if(wl) rows.push({ '날짜':ds, '근무기록':wl.text, '할일':'', '완료':'' });
-      } else {
-        todos.forEach(function(t){
-          rows.push({ '날짜':ds, '근무기록': wl ? wl.text : '', '할일':t.text, '완료': t.done ? 'O' : '' });
-        });
-      }
-    });
-    if(!rows.length){ showToast('내보낼 기록이 없습니다'); return; }
-    var wb = XLSX.utils.book_new();
-    var ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch:12},{wch:26},{wch:34},{wch:6}];
-    XLSX.utils.book_append_sheet(wb, ws, '일일업무기록');
-    XLSX.writeFile(wb, '일일업무기록_' + todayStr() + '.xlsx');
+    if(typeof XLSX === 'undefined'){
+      showToast('엑셀 라이브러리를 불러오지 못했습니다. 새로고침 후 다시 시도해주세요');
+      return;
+    }
+    try{
+      var rows = [];
+      Object.keys(state.records).sort().forEach(function(ds){
+        var r = state.records[ds];
+        var wl = worklogLabel(r);
+        var todos = r.todos || [];
+        if(!todos.length){
+          if(wl) rows.push({ '날짜':ds, '근무기록':wl.text, '할일':'', '완료':'' });
+        } else {
+          todos.forEach(function(t){
+            rows.push({ '날짜':ds, '근무기록': wl ? wl.text : '', '할일':t.text, '완료': t.done ? 'O' : '' });
+          });
+        }
+      });
+      if(!rows.length){ showToast('내보낼 기록이 없습니다'); return; }
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [{wch:12},{wch:26},{wch:34},{wch:6}];
+      XLSX.utils.book_append_sheet(wb, ws, '일일업무기록');
+      XLSX.writeFile(wb, '일일업무기록_' + todayStr() + '.xlsx');
+    } catch(e){
+      console.error('exportXlsx failed', e);
+      showToast('내보내기 실패: ' + e.message);
+    }
   }
 
   // ---------- history: list ----------
@@ -591,9 +600,9 @@ input:focus{outline:2px solid var(--amber); outline-offset:1px;}
       }
     };
   });
-  document.querySelectorAll('.histtoggle button').forEach(function(btn){
+  document.querySelectorAll('.histtoggle button[data-view]').forEach(function(btn){
     btn.onclick = function(){
-      document.querySelectorAll('.histtoggle button').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('.histtoggle button[data-view]').forEach(function(b){b.classList.remove('active');});
       btn.classList.add('active');
       var view = btn.getAttribute('data-view');
       document.getElementById('hist-list').style.display = view==='list' ? 'block':'none';
