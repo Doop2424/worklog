@@ -442,8 +442,16 @@ function cloudSave() {
   clearTimeout(syncTimer);
   setSyncBadge('저장 중…');
   syncTimer = setTimeout(() => {
+    // todos는 이 앱이 관리하는 필드가 아니므로, 어떤 경우에도 전송하지 않는다.
+    // (다른 탭에서 todos가 갱신된 뒤 이 앱의 오래된 로컬 상태로 저장해도 todos가 지워지지 않도록)
+    const sanitized = {};
+    Object.keys(records).forEach(k => {
+      const rec = records[k] || {};
+      const { todos, ...rest } = rec;
+      sanitized[k] = rest;
+    });
     db.collection('worklogs').doc(user.uid).set({
-      records, salaryType, salaryAmount, joinDate,
+      records: sanitized, salaryType, salaryAmount, joinDate,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true }).then(() => setSyncBadge('동기화됨 ✓'))
       .catch(() => setSyncBadge('동기화 실패 — 오프라인?'));
@@ -775,10 +783,12 @@ function deleteSelected() {
   pushUndo();
   let n = 0;
   const wholeDeletes = [];
+  const fieldDeletes = [];
   selected.forEach(k => {
     if (records[k]) {
       if (records[k].todos && records[k].todos.length) {
         delete records[k].start; delete records[k].end; delete records[k].type; delete records[k].memo;
+        fieldDeletes.push(k);
       } else {
         delete records[k];
         wholeDeletes.push(k);
@@ -787,10 +797,16 @@ function deleteSelected() {
     }
   });
   saveData();
-  // merge:true는 로컬에서 사라진 키를 서버에서 자동으로 지워주지 않으므로, 완전 삭제된 날짜는 명시적으로 제거
-  if (cloudReady && user && wholeDeletes.length) {
+  // sanitize된 cloudSave는 빈 객체를 보내도 서버의 기존 필드를 지우지 못하므로, 명시적으로 삭제한다.
+  if (cloudReady && user && (wholeDeletes.length || fieldDeletes.length)) {
     const payload = {};
     wholeDeletes.forEach(k => { payload['records.' + k] = firebase.firestore.FieldValue.delete(); });
+    fieldDeletes.forEach(k => {
+      payload['records.' + k + '.start'] = firebase.firestore.FieldValue.delete();
+      payload['records.' + k + '.end'] = firebase.firestore.FieldValue.delete();
+      payload['records.' + k + '.type'] = firebase.firestore.FieldValue.delete();
+      payload['records.' + k + '.memo'] = firebase.firestore.FieldValue.delete();
+    });
     db.collection('worklogs').doc(user.uid).update(payload).catch(() => {});
   }
   toast(n ? n + '일 기록 삭제' : '삭제할 기록 없음');
