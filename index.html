@@ -751,11 +751,18 @@ function saveSelected() {
   pushUndo();
   const memo = document.getElementById('memoInput').value.trim();
   if (dayType === 'leave') {
-    selected.forEach(k => { records[k] = { type: 'leave' }; if (memo) records[k].memo = memo; });
+    selected.forEach(k => {
+      records[k] = Object.assign({}, records[k], { type: 'leave' });
+      delete records[k].start; delete records[k].end;
+      if (memo) records[k].memo = memo; else delete records[k].memo;
+    });
   } else {
     const s = document.getElementById('startTime').value, e = document.getElementById('endTime').value;
     if (!s || !e) { undoStack.pop(); updateUndoBtn(); return toast('시간을 입력하세요', 2000); }
-    selected.forEach(k => { records[k] = { start: s, end: e, type: dayType }; if (memo) records[k].memo = memo; });
+    selected.forEach(k => {
+      records[k] = Object.assign({}, records[k], { start: s, end: e, type: dayType });
+      if (memo) records[k].memo = memo; else delete records[k].memo;
+    });
   }
   document.getElementById('memoInput').value = '';
   saveData();
@@ -767,7 +774,16 @@ function deleteSelected() {
   if (!selected.size) return;
   pushUndo();
   let n = 0;
-  selected.forEach(k => { if (records[k]) { delete records[k]; n++; } });
+  selected.forEach(k => {
+    if (records[k]) {
+      if (records[k].todos && records[k].todos.length) {
+        delete records[k].start; delete records[k].end; delete records[k].type; delete records[k].memo;
+      } else {
+        delete records[k];
+      }
+      n++;
+    }
+  });
   saveData();
   toast(n ? n + '일 기록 삭제' : '삭제할 기록 없음');
   selected = new Set();
